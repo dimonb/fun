@@ -6,7 +6,7 @@ let server;
 let base;
 
 before(async () => {
-  server = createApp();
+  server = await createApp();
   await new Promise((resolve) => server.listen(0, resolve));
   base = `http://localhost:${server.address().port}`;
 });
@@ -43,4 +43,13 @@ test('blocks path traversal', async () => {
 test('rejects non-GET methods', async () => {
   const res = await fetch(`${base}/`, { method: 'POST' });
   assert.equal(res.status, 405);
+});
+
+test('serves main.js with the compiled shader injected as valid JS', async () => {
+  const res = await fetch(`${base}/main.js`);
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  assert.doesNotMatch(body, /\/\*__SHADER__\*\//);
+  assert.match(body, /const fs = "precision highp float;/);
+  assert.doesNotThrow(() => new Function(body));
 });

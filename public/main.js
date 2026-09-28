@@ -2,37 +2,10 @@ const canvas = document.getElementById('c');
 const gl = canvas.getContext('webgl');
 
 const vs = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
-const fs = `
-precision highp float;
-uniform vec2 res;
-uniform vec2 center;
-uniform float scale;
-uniform float time;
-uniform int julia;
-uniform vec2 jc;
-
-vec3 palette(float t) {
-  return 0.5 + 0.5 * cos(6.28318 * (t + vec3(0.0, 0.10, 0.20)) + time * 0.3);
-}
-
-void main() {
-  vec2 uv = (gl_FragCoord.xy - 0.5 * res) / res.y;
-  vec2 pos = center + uv * scale;
-  vec2 z = julia == 1 ? pos : vec2(0.0);
-  vec2 c = julia == 1 ? jc : pos;
-  float i = 0.0;
-  const float MAX = 500.0;
-  for (float n = 0.0; n < MAX; n++) {
-    z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
-    if (dot(z, z) > 256.0) break;
-    i++;
-  }
-  if (i >= MAX) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
-  float sm = i - log2(log2(dot(z, z))) + 4.0;
-  vec3 col = palette(sm * 0.02);
-  col *= 0.9 + 0.1 * sin(sm * 0.5);
-  gl_FragColor = vec4(pow(col, vec3(0.9)), 1.0);
-}`;
+// Шейдер инжектится сервером при старте: формула фрактала задаётся DSL-строкой
+// в src/fractal.js, компилируется в GLSL через eval (src/dsl.js) и подставляется
+// сюда на место маркера __SHADER__.
+const fs = /*__SHADER__*/ '';
 
 function shader(type, src) {
   const s = gl.createShader(type);

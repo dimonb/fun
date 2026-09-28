@@ -1,0 +1,23 @@
+{
+  "name": "fractal",
+  "version": "1.0.0",
+  "description": "A tiny zero-dependency Node server that renders an animated Mandelbrot/Julia fractal with WebGL",
+  "type": "module",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch-path=src --watch-path=public src/server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "fractal",
+    "mandelbrot",
+    "julia",
+    "webgl"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}
